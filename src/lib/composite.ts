@@ -67,15 +67,14 @@ export const browserEnv: CompositeEnv = {
     }),
 };
 
-function roundedRectPath(ctx: Ctx, x: number, y: number, w: number, h: number, r: number) {
+export function traceRoundedRect(p: CanvasPath, x: number, y: number, w: number, h: number, r: number) {
   const k = Math.min(r, w / 2, h / 2);
-  ctx.beginPath();
-  ctx.moveTo(x + k, y);
-  ctx.arcTo(x + w, y, x + w, y + h, k);
-  ctx.arcTo(x + w, y + h, x, y + h, k);
-  ctx.arcTo(x, y + h, x, y, k);
-  ctx.arcTo(x, y, x + w, y, k);
-  ctx.closePath();
+  p.moveTo(x + k, y);
+  p.arcTo(x + w, y, x + w, y + h, k);
+  p.arcTo(x + w, y + h, x, y + h, k);
+  p.arcTo(x, y + h, x, y, k);
+  p.arcTo(x, y, x + w, y, k);
+  p.closePath();
 }
 
 function drawBow(ctx: Ctx, env: CompositeEnv, x: number, y: number, size: number, bg: string, fg: string) {
@@ -130,16 +129,22 @@ function drawFooter(ctx: Ctx, text: string, photoBottomRect: ReturnType<typeof p
   letters.forEach((l, i) => ctx.fillText(l, xs[i], y));
 }
 
-/** Compone la foto con el marco y el logo de Ashanty y devuelve un JPEG. */
-export async function composite(
-  image: Drawable,
-  options: CompositeOptions = {},
-  env: CompositeEnv = browserEnv,
-): Promise<Blob> {
-  const { width: iw, height: ih } = sizeOf(image);
-  if (!iw || !ih) throw new Error('La imagen no tiene tamaño.');
+export interface FrameBase {
+  canvas: HTMLCanvasElement | OffscreenCanvas;
+  rect: ReturnType<typeof photoRect>;
+  width: number;
+  height: number;
+}
 
-  const spec = FORMATS[resolveFormat(options.format ?? 'auto', iw, ih)];
+/** Fondo, logo y texto inferior: todo menos la foto (sirve para fotos y para cada cuadro de un video). */
+export async function drawFrameBase(
+  mediaW: number,
+  mediaH: number,
+  options: CompositeOptions,
+  env: CompositeEnv,
+): Promise<FrameBase> {
+  if (!mediaW || !mediaH) throw new Error('La imagen no tiene tamaño.');
+  const spec = FORMATS[resolveFormat(options.format ?? 'auto', mediaW, mediaH)];
   const { bg, fg } = PALETTES[options.color ?? 'plum'];
   const text = options.text ?? DEFAULT_TEXT;
 
@@ -151,19 +156,31 @@ export async function composite(
 
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, spec.width, spec.height);
-
   drawLogo(ctx, env, spec, bg, fg);
+  const rect = photoRect(spec, mediaW, mediaH);
+  drawFooter(ctx, text, rect, spec.width, spec.height, fg);
+  return { canvas, rect, width: spec.width, height: spec.height };
+}
 
-  const rect = photoRect(spec, iw, ih);
+/** Compone la foto con el marco y el logo de Ashanty y devuelve un JPEG. */
+export async function composite(
+  image: Drawable,
+  options: CompositeOptions = {},
+  env: CompositeEnv = browserEnv,
+): Promise<Blob> {
+  const { width: iw, height: ih } = sizeOf(image);
+  const base = await drawFrameBase(iw, ih, options, env);
+  const ctx = base.canvas.getContext('2d') as Ctx;
+  const { rect } = base;
+
   ctx.save();
-  roundedRectPath(ctx, rect.x, rect.y, rect.w, rect.h, CORNER_RADIUS);
+  ctx.beginPath();
+  traceRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, CORNER_RADIUS);
   ctx.clip();
   ctx.fillStyle = '#ffffff'; // fondo para fotos con transparencia
   ctx.fill();
   drawScaled(ctx, image, rect.x, rect.y, rect.w, rect.h, env.createCanvas);
   ctx.restore();
 
-  drawFooter(ctx, text, rect, spec.width, spec.height, fg);
-
-  return env.toBlob(canvas, JPEG_QUALITY);
+  return env.toBlob(base.canvas, JPEG_QUALITY);
 }

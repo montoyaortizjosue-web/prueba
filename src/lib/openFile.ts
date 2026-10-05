@@ -1,6 +1,7 @@
-import { isAcceptedFile, isHeic, MAX_PHOTOS, MAX_SIDE } from './files';
+import { isAcceptedFile, isHeic, isVideoFile, MAX_PHOTOS, MAX_SIDE } from './files';
 import { release } from './decode';
 import { downscaleToCanvas } from './scale';
+import { MAX_VIDEO_SECONDS, openVideoElement, videoRecordingSupported } from './video';
 import type { Drawable } from './types';
 
 export interface OpenedPhoto {
@@ -11,6 +12,10 @@ export interface OpenedPhoto {
   thumb: Blob;
   width: number;
   height: number;
+  kind: 'image' | 'video';
+  /** Solo videos: el archivo original (se procesa después) y su duración en segundos. */
+  file?: File;
+  duration?: number;
 }
 
 export interface PhotoFailure {
@@ -33,6 +38,8 @@ export interface OpenDeps {
   convertHeic: (file: Blob) => Promise<Blob>;
   /** Reduce, valida y codifica; lanza si el resultado no sirve (así se prueba otro método). */
   prepare: (source: Drawable, maxSide: number) => Promise<PreparedPhoto>;
+  /** Videos: cuadro de portada reducido + duración. */
+  openVideo: (file: File, maxSide: number) => Promise<PreparedPhoto & { duration: number }>;
 }
 
 function readAsDataUrl(file: Blob): Promise<string> {
@@ -126,10 +133,23 @@ async function convertHeic(file: Blob): Promise<Blob> {
   return Array.isArray(out) ? out[0] : out;
 }
 
+async function openVideo(file: File, maxSide: number) {
+  if (!videoRecordingSupported()) throw new PhotoOpenError(MSG_VIDEO_UNSUPPORTED);
+  const info = await openVideoElement(file);
+  try {
+    if (info.duration > MAX_VIDEO_SECONDS) throw new PhotoOpenError(MSG_VIDEO_LONG);
+    const poster = await prepare(info.video, maxSide);
+    return { ...poster, duration: info.duration };
+  } finally {
+    info.dispose();
+  }
+}
+
 export const browserOpenDeps: OpenDeps = {
   loaders: [viaObjectUrl, viaDataUrl, viaBitmap, viaBitmapResized],
   convertHeic,
   prepare,
+  openVideo,
 };
 
 /** Prueba cada método de lectura; si uno abre pero no se puede reducir, pasa al siguiente. */
@@ -152,8 +172,14 @@ export const MSG_HEIC =
   'Es un archivo HEIC que no se pudo convertir. Ábrelo en tu galería y expórtalo o compártelo como JPG, o súbelo como JPG desde Google Fotos.';
 export const MSG_BROKEN =
   'La foto está dañada o no se descargó por completo de Google Fotos. Descárgala primero al dispositivo y vuelve a subirla.';
+export const MSG_VIDEO =
+  'No se pudo abrir este video. Puede estar dañado, ser muy pesado para este dispositivo o tener un formato que el navegador no reconoce. Prueba con un MP4.';
+export const MSG_VIDEO_LONG = `El video dura más de ${MAX_VIDEO_SECONDS / 60} minutos. Recórtalo y vuelve a subirlo.`;
+export const MSG_VIDEO_UNSUPPORTED =
+  'Este navegador no puede preparar videos. Usa Chrome (Android) o Safari actualizado (iPhone).';
 export const MSG_FORMAT =
   'Este archivo no parece una foto compatible. Usa JPG, PNG, WebP, GIF, BMP, AVIF o HEIC.';
+
 
 export class PhotoOpenError extends Error {}
 
@@ -163,6 +189,15 @@ export async function openFile(
   maxSide: number = MAX_SIDE,
 ): Promise<OpenedPhoto> {
   if (!isAcceptedFile(file)) throw new PhotoOpenError(MSG_FORMAT);
+
+  if (isVideoFile(file)) {
+    try {
+      const v = await deps.openVideo(file, maxSide);
+      return { name: file.name, kind: 'video', file, ...v };
+    } catch (e) {
+      throw e instanceof PhotoOpenError ? e : new PhotoOpenError(MSG_VIDEO);
+    }
+  }
 
   let prepared = await tryLoaders(file, deps, maxSide);
 
@@ -176,7 +211,7 @@ export async function openFile(
   }
 
   if (!prepared) throw new PhotoOpenError(isHeic(file) ? MSG_HEIC : MSG_BROKEN);
-  return { name: file.name, ...prepared };
+  return { name: file.name, kind: 'image', ...prepared };
 }
 
 export interface OpenFilesResult {

@@ -8,10 +8,17 @@ export function extensionOf(name: string): string {
   return m ? m[1].toLowerCase() : '';
 }
 
+const VIDEO_EXTENSIONS = ['mp4', 'mov', 'm4v', 'webm', '3gp', 'mkv'];
+
+export function isVideoFile(file: { name: string; type: string }): boolean {
+  if (file.type && file.type.startsWith('video/')) return true;
+  return VIDEO_EXTENSIONS.includes(extensionOf(file.name));
+}
+
 /** Acepta por tipo MIME o, si el navegador no lo informa, por extensión. */
 export function isAcceptedFile(file: { name: string; type: string }): boolean {
   if (file.type && file.type.startsWith('image/')) return true;
-  return EXTENSIONS.includes(extensionOf(file.name));
+  return EXTENSIONS.includes(extensionOf(file.name)) || isVideoFile(file);
 }
 
 export function isHeic(file: { name: string; type: string }): boolean {

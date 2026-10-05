@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { MSG_BROKEN, MSG_FORMAT, MSG_HEIC, openFile, openFiles, type OpenDeps } from './openFile';
+import { MSG_BROKEN, MSG_FORMAT, MSG_HEIC, MSG_VIDEO, openFile, openFiles, type OpenDeps } from './openFile';
 import type { Drawable } from './types';
 
 const fakeImage = { width: 4000, height: 3000 } as unknown as Drawable;
@@ -10,6 +10,7 @@ function deps(over: Partial<OpenDeps> = {}): OpenDeps {
     loaders: [async () => fakeImage],
     convertHeic: async () => new Blob(['jpeg']),
     prepare: async (_s, max) => prepared(max, (max * 3) / 4),
+    openVideo: async () => ({ ...prepared(1080, 1920), duration: 12 }),
     ...over,
   };
 }
@@ -86,6 +87,24 @@ describe('openFile', () => {
     const d = deps({ loaders: [fail], convertHeic: fail });
     await expect(openFile(file('a.jpg'), d)).rejects.toThrow(MSG_BROKEN);
     expect(MSG_BROKEN).toMatch(/Google Fotos/);
+  });
+});
+
+describe('videos', () => {
+  it('abre un video y guarda el archivo original y la duración', async () => {
+    const f = file('clip.mp4', 'video/mp4');
+    const v = await openFile(f, deps());
+    expect(v).toMatchObject({ kind: 'video', file: f, duration: 12, width: 1080 });
+  });
+  it('acepta .mov sin MIME', async () => {
+    await expect(openFile(file('IMG_1.MOV', ''), deps())).resolves.toMatchObject({ kind: 'video' });
+  });
+  it('video que no abre -> mensaje claro en español', async () => {
+    const d = deps({ openVideo: () => Promise.reject(new Error('x')) });
+    await expect(openFile(file('a.mp4', 'video/mp4'), d)).rejects.toThrow(MSG_VIDEO);
+  });
+  it('las fotos siguen siendo kind=image', async () => {
+    await expect(openFile(file('a.jpg'), deps())).resolves.toMatchObject({ kind: 'image' });
   });
 });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cleanName, outputName, uniqueOutputNames } from './filename';
-import { isAcceptedFile, isHeic } from './files';
+import { isAcceptedFile, isHeic, isVideoFile } from './files';
 
 describe('nombres de salida', () => {
   it('quita extensión, tildes y caracteres raros', () => {
@@ -16,6 +16,10 @@ describe('nombres de salida', () => {
   });
   it('usa "foto" si queda vacío', () => {
     expect(outputName('日本語.heic')).toBe('foto-ashanty.jpg');
+  });
+  it('respeta la extensión de cada archivo (videos)', () => {
+    expect(uniqueOutputNames(['a.mov', 'a.jpg'], ['mp4', 'jpg'])).toEqual(['a-ashanty.mp4', 'a-2-ashanty.jpg']);
+    expect(outputName('Clip Final.MOV', 'webm')).toBe('clip-final-ashanty.webm');
   });
   it('evita repetidos', () => {
     expect(uniqueOutputNames(['a.jpg', 'a.png', 'b.jpg'])).toEqual([
@@ -43,5 +47,13 @@ describe('archivos aceptados', () => {
     expect(isHeic({ name: 'a.HEIC', type: '' })).toBe(true);
     expect(isHeic({ name: 'a', type: 'image/heif' })).toBe(true);
     expect(isHeic({ name: 'a.jpg', type: 'image/jpeg' })).toBe(false);
+  });
+});
+
+describe('videos aceptados', () => {
+  it('por MIME y por extensión', () => {
+    expect(isVideoFile({ name: 'x', type: 'video/quicktime' })).toBe(true);
+    for (const e of ['mp4', 'MOV', 'webm', 'm4v', '3gp']) expect(isAcceptedFile({ name: `v.${e}`, type: '' })).toBe(true);
+    expect(isVideoFile({ name: 'a.jpg', type: 'image/jpeg' })).toBe(false);
   });
 });

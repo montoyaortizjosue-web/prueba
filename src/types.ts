@@ -6,6 +6,10 @@ export interface Photo {
   /** JPEG orientado y reducido (pesa poco; se decodifica solo al procesar). */
   blob: Blob;
   thumbUrl: string;
+  kind: 'image' | 'video';
+  /** Solo videos: archivo original y duración (s). `blob` es el cuadro de portada. */
+  file?: File;
+  duration?: number;
 }
 
 export interface StyleOptions {

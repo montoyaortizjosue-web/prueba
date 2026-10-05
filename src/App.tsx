@@ -53,7 +53,9 @@ export default function App() {
 
   const options: StyleOptions = { format, color, text };
   const limit = step === 1 ? 1 : step >= 2 ? photos.length : 0;
-  const { get, busy, error } = useRendered(photos, options, limit);
+  const { get, busy, error, getVideo, prepareVideos, cancelVideos, videoProgress, videoError } = useRendered(photos, options, limit);
+  // Resultado final de cada archivo: la foto con marco, o el video ya preparado.
+  const finalOf = useCallback((p: Photo) => (p.kind === 'video' ? getVideo(p.id) : get(p.id)), [get, getVideo]);
 
   const addFiles = useCallback(
     async (files: File[]) => {
@@ -68,7 +70,7 @@ export default function App() {
           const id = String(nextId++);
           const thumbUrl = URL.createObjectURL(p.thumb);
           thumbs.current.set(id, thumbUrl);
-          return { id, name: p.name, blob: p.blob, thumbUrl };
+          return { id, name: p.name, blob: p.blob, thumbUrl, kind: p.kind, file: p.file, duration: p.duration };
         });
         setPhotos((prev) => [...prev, ...added]);
         setErrors((prev) => [...prev, ...result.errors]);
@@ -105,8 +107,8 @@ export default function App() {
     setStatus('Empezaste de nuevo');
   };
 
-  const allReady = photos.length > 0 && photos.every((p) => get(p.id));
-  const ready = [photos.length > 0 && !progress, photos.length > 0, allReady && !busy, true][step];
+  const allReady = photos.length > 0 && photos.every((p) => finalOf(p));
+  const ready = [photos.length > 0 && !progress, photos.length > 0, allReady && !busy && !videoProgress, true][step];
   const first = photos[0];
 
   return (
@@ -144,10 +146,22 @@ export default function App() {
           />
         )}
         {step === 2 && (
-          <StepReview photos={photos} get={get} busy={busy} error={error} onRemove={removePhoto} headingRef={heading} />
+          <StepReview
+            photos={photos}
+            get={get}
+            getVideo={getVideo}
+            busy={busy}
+            error={error}
+            videoProgress={videoProgress}
+            videoError={videoError}
+            onPrepareVideos={prepareVideos}
+            onCancelVideos={cancelVideos}
+            onRemove={removePhoto}
+            headingRef={heading}
+          />
         )}
         {step === 3 && (
-          <StepDownload photos={photos} get={get} onRestart={restart} onStatus={setStatus} headingRef={heading} />
+          <StepDownload photos={photos} get={finalOf} onRestart={restart} onStatus={setStatus} headingRef={heading} />
         )}
       </main>
 

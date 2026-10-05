@@ -7,7 +7,7 @@ import { StepShell } from './StepShell';
 
 interface Props {
   photos: Photo[];
-  get: (id: string) => Rendered | undefined;
+  get: (p: Photo) => Rendered | undefined;
   onRestart: () => void;
   onStatus: (s: string) => void;
   headingRef: React.Ref<HTMLHeadingElement>;
@@ -18,10 +18,10 @@ const shareSupported = canShareFiles();
 export function StepDownload({ photos, get, onRestart, onStatus, headingRef }: Props) {
   const [working, setWorking] = useState(false);
   const items = photos.flatMap((p) => {
-    const r = get(p.id);
-    return r ? [{ photo: p, name: p.name, blob: r.blob, url: r.url }] : [];
+    const r = get(p);
+    return r ? [{ photo: p, name: p.name, blob: r.blob, url: r.url, ext: r.ext, isVideo: p.kind === 'video' }] : [];
   });
-  const names = uniqueOutputNames(items.map((i) => i.name));
+  const names = uniqueOutputNames(items.map((i) => i.name), items.map((i) => i.ext));
 
   const downloadZip = async () => {
     setWorking(true);
@@ -63,11 +63,11 @@ export function StepDownload({ photos, get, onRestart, onStatus, headingRef }: P
   return (
     <StepShell
       ref={headingRef}
-      title="Descarga tus fotos"
-      help="¡Listo! Tus fotos ya tienen el marco y el logo de Ashanty."
+      title="Descarga tus fotos y videos"
+      help="¡Listo! Tus fotos y videos ya tienen el marco y el logo de Ashanty."
       todo={[
         <>Toca <strong>Descargar todo</strong> (o <strong>Descargar</strong> en cada foto) y acepta la confirmación del navegador.</>,
-        'Busca las fotos en la carpeta Descargas o en tu galería.',
+        'Busca los archivos en la carpeta Descargas o en tu galería.',
         'Súbelas a TikTok, Instagram o WhatsApp.',
       ]}
     >
@@ -85,7 +85,11 @@ export function StepDownload({ photos, get, onRestart, onStatus, headingRef }: P
       <ul className="grid">
         {items.map((it, i) => (
           <li key={it.photo.id}>
-            <img src={it.url} alt={`${it.name} con marco`} />
+            {it.isVideo ? (
+              <video src={it.url} controls playsInline preload="metadata" aria-label={`${it.name} con marco`} />
+            ) : (
+              <img src={it.url} alt={`${it.name} con marco`} />
+            )}
             <div className="row">
               <button type="button" className="btn small-btn" onClick={() => saveBlob(it.blob, names[i])}>
                 Descargar<span className="sr-only"> {names[i]}</span>
