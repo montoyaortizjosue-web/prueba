@@ -89,11 +89,27 @@ export function spacedLetterXs(widths: number[], spacing: number, canvasW: numbe
   });
 }
 
-/** Tamaños intermedios al reducir de mitad en mitad hasta acercarse al destino. */
-export function halvingSteps(srcW: number, srcH: number, dstW: number, dstH: number) {
+/** Los celulares (iOS) fallan en silencio con canvas de más de ~16,7 MP. */
+export const MAX_CANVAS_AREA = 12_000_000;
+
+/**
+ * Tamaños intermedios al reducir hacia el destino: primero un salto directo si la
+ * foto es enorme (para no crear canvas gigantes) y luego de mitad en mitad.
+ */
+export function halvingSteps(srcW: number, srcH: number, dstW: number, dstH: number, maxArea = MAX_CANVAS_AREA) {
   const steps: Array<{ w: number; h: number }> = [];
   let w = srcW;
   let h = srcH;
+  if (w * h > maxArea) {
+    const k = Math.sqrt(maxArea / (w * h));
+    const jw = Math.floor(w * k);
+    const jh = Math.floor(h * k);
+    if (jw >= dstW && jh >= dstH) {
+      w = jw;
+      h = jh;
+      steps.push({ w, h });
+    }
+  }
   while (w / 2 >= dstW && h / 2 >= dstH) {
     w = Math.floor(w / 2);
     h = Math.floor(h / 2);

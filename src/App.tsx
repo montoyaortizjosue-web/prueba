@@ -5,19 +5,12 @@ import { StepReview } from './components/StepReview';
 import { StepStyle } from './components/StepStyle';
 import { StepUpload } from './components/StepUpload';
 import { Stepper } from './components/Stepper';
-import { DEFAULT_TEXT, downscaleToCanvas, openFiles, type PhotoFailure } from './lib';
+import { DEFAULT_TEXT, openFiles, type PhotoFailure } from './lib';
 import type { Photo, StyleOptions } from './types';
 import { useRendered } from './useRendered';
 
 const TEXT_DEBOUNCE_MS = 350;
 let nextId = 1;
-
-function makeThumb(canvas: HTMLCanvasElement): Promise<string> {
-  const small = downscaleToCanvas(canvas, 240);
-  return new Promise((resolve, reject) =>
-    small.toBlob((b) => (b ? resolve(URL.createObjectURL(b)) : reject(new Error('thumb'))), 'image/jpeg', 0.8),
-  );
-}
 
 export default function App() {
   const [step, setStep] = useState(0);
@@ -66,24 +59,31 @@ export default function App() {
     async (files: File[]) => {
       setProgress({ current: 0, total: files.length });
       setStatus('Abriendo fotos…');
-      const result = await openFiles(files, {
-        existing: photos.length,
-        onProgress: (current, total) => setProgress({ current, total }),
-      });
-      const added: Photo[] = [];
-      for (const p of result.photos) {
-        const id = String(nextId++);
-        const thumbUrl = await makeThumb(p.canvas);
-        thumbs.current.set(id, thumbUrl);
-        added.push({ id, name: p.name, canvas: p.canvas, thumbUrl });
+      try {
+        const result = await openFiles(files, {
+          existing: photos.length,
+          onProgress: (current, total) => setProgress({ current, total }),
+        });
+        const added: Photo[] = result.photos.map((p) => {
+          const id = String(nextId++);
+          const thumbUrl = URL.createObjectURL(p.thumb);
+          thumbs.current.set(id, thumbUrl);
+          return { id, name: p.name, blob: p.blob, thumbUrl };
+        });
+        setPhotos((prev) => [...prev, ...added]);
+        setErrors((prev) => [...prev, ...result.errors]);
+        setStatus(
+          `${added.length} ${added.length === 1 ? 'foto agregada' : 'fotos agregadas'}` +
+            (result.errors.length ? `, ${result.errors.length} con problemas` : ''),
+        );
+      } catch {
+        setErrors((prev) => [
+          ...prev,
+          { name: 'Fotos', message: 'Algo salió mal al abrir las fotos. Vuelve a elegirlas.' },
+        ]);
+      } finally {
+        setProgress(null);
       }
-      setPhotos((prev) => [...prev, ...added]);
-      setErrors((prev) => [...prev, ...result.errors]);
-      setProgress(null);
-      setStatus(
-        `${added.length} ${added.length === 1 ? 'foto agregada' : 'fotos agregadas'}` +
-          (result.errors.length ? `, ${result.errors.length} con problemas` : ''),
-      );
     },
     [photos.length],
   );

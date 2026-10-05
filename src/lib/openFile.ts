@@ -1,11 +1,14 @@
 import { isAcceptedFile, isHeic, MAX_PHOTOS, MAX_SIDE } from './files';
+import { release } from './decode';
 import { downscaleToCanvas } from './scale';
 import type { Drawable } from './types';
 
 export interface OpenedPhoto {
   name: string;
-  /** Foto ya orientada (EXIF aplicado) y reducida a MAX_SIDE. */
-  canvas: HTMLCanvasElement;
+  /** JPEG ya orientado (EXIF aplicado) y reducido a MAX_SIDE: pesa poco en memoria. */
+  blob: Blob;
+  /** Miniatura JPEG para la lista. */
+  thumb: Blob;
   width: number;
   height: number;
 }
@@ -17,11 +20,19 @@ export interface PhotoFailure {
 
 export type Loader = (file: Blob) => Promise<Drawable>;
 
+export interface PreparedPhoto {
+  blob: Blob;
+  thumb: Blob;
+  width: number;
+  height: number;
+}
+
 /** Cada paso es inyectable para probar el orden de respaldo sin navegador. */
 export interface OpenDeps {
   loaders: Loader[];
   convertHeic: (file: Blob) => Promise<Blob>;
-  toCanvas: (source: Drawable, maxSide: number) => HTMLCanvasElement;
+  /** Reduce, valida y codifica; lanza si el resultado no sirve (así se prueba otro método). */
+  prepare: (source: Drawable, maxSide: number) => Promise<PreparedPhoto>;
 }
 
 function readAsDataUrl(file: Blob): Promise<string> {
@@ -66,6 +77,49 @@ const viaBitmap: Loader = async (file) => {
   return createImageBitmap(file, { imageOrientation: 'from-image' });
 };
 
+// Último recurso para fotos enormes: el navegador las decodifica ya reducidas.
+const viaBitmapResized: Loader = async (file) => {
+  if (typeof createImageBitmap !== 'function') throw new Error('createImageBitmap no disponible.');
+  return createImageBitmap(file, { imageOrientation: 'from-image', resizeWidth: MAX_SIDE, resizeQuality: 'high' });
+};
+
+function canvasToBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
+  return new Promise((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('No se pudo codificar.'))), 'image/jpeg', quality),
+  );
+}
+
+/** Un canvas que falló en silencio queda totalmente transparente. */
+function looksBlank(canvas: HTMLCanvasElement): boolean {
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return true;
+  for (let i = 1; i <= 5; i++) {
+    for (let j = 1; j <= 5; j++) {
+      const x = Math.floor((canvas.width * i) / 6);
+      const y = Math.floor((canvas.height * j) / 6);
+      if (ctx.getImageData(x, y, 1, 1).data[3] !== 0) return false;
+    }
+  }
+  return true;
+}
+
+async function prepare(source: Drawable, maxSide: number): Promise<PreparedPhoto> {
+  const canvas = downscaleToCanvas(source, maxSide);
+  try {
+    if (looksBlank(canvas)) throw new Error('Canvas vacío.');
+    // Las fotos con transparencia (PNG) quedan sobre blanco en vez de negro.
+    const ctx = canvas.getContext('2d')!;
+    ctx.globalCompositeOperation = 'destination-over';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const blob = await canvasToBlob(canvas, 0.95);
+    const thumb = await canvasToBlob(downscaleToCanvas(canvas, 240), 0.8);
+    return { blob, thumb, width: canvas.width, height: canvas.height };
+  } finally {
+    canvas.width = canvas.height = 0; // libera la memoria ya
+  }
+}
+
 async function convertHeic(file: Blob): Promise<Blob> {
   const { default: heic2any } = await import('heic2any');
   const out = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 });
@@ -73,17 +127,22 @@ async function convertHeic(file: Blob): Promise<Blob> {
 }
 
 export const browserOpenDeps: OpenDeps = {
-  loaders: [viaObjectUrl, viaDataUrl, viaBitmap],
+  loaders: [viaObjectUrl, viaDataUrl, viaBitmap, viaBitmapResized],
   convertHeic,
-  toCanvas: (source, maxSide) => downscaleToCanvas(source, maxSide),
+  prepare,
 };
 
-async function tryLoaders(file: Blob, loaders: Loader[]): Promise<Drawable | null> {
-  for (const load of loaders) {
+/** Prueba cada método de lectura; si uno abre pero no se puede reducir, pasa al siguiente. */
+async function tryLoaders(file: Blob, deps: OpenDeps, maxSide: number): Promise<PreparedPhoto | null> {
+  for (const load of deps.loaders) {
+    let source: Drawable | null = null;
     try {
-      return await load(file);
+      source = await load(file);
+      return await deps.prepare(source, maxSide);
     } catch {
       // probar el siguiente método
+    } finally {
+      if (source) release(source);
     }
   }
   return null;
@@ -105,22 +164,19 @@ export async function openFile(
 ): Promise<OpenedPhoto> {
   if (!isAcceptedFile(file)) throw new PhotoOpenError(MSG_FORMAT);
 
-  let source = await tryLoaders(file, deps.loaders);
+  let prepared = await tryLoaders(file, deps, maxSide);
 
-  if (!source) {
+  if (!prepared) {
     try {
       const jpeg = await deps.convertHeic(file);
-      source = await tryLoaders(jpeg, deps.loaders);
+      prepared = await tryLoaders(jpeg, deps, maxSide);
     } catch {
       // sin conversión posible: se informa abajo
     }
   }
 
-  if (!source) throw new PhotoOpenError(isHeic(file) ? MSG_HEIC : MSG_BROKEN);
-
-  const canvas = deps.toCanvas(source, maxSide);
-  if (typeof ImageBitmap !== 'undefined' && source instanceof ImageBitmap) source.close();
-  return { name: file.name, canvas, width: canvas.width, height: canvas.height };
+  if (!prepared) throw new PhotoOpenError(isHeic(file) ? MSG_HEIC : MSG_BROKEN);
+  return { name: file.name, ...prepared };
 }
 
 export interface OpenFilesResult {

@@ -3,7 +3,8 @@ import type { FormatOption, FrameColor } from './lib';
 export interface Photo {
   id: string;
   name: string;
-  canvas: HTMLCanvasElement;
+  /** JPEG orientado y reducido (pesa poco; se decodifica solo al procesar). */
+  blob: Blob;
   thumbUrl: string;
 }
 

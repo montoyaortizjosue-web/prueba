@@ -158,6 +158,8 @@ export async function composite(
   ctx.save();
   roundedRectPath(ctx, rect.x, rect.y, rect.w, rect.h, CORNER_RADIUS);
   ctx.clip();
+  ctx.fillStyle = '#ffffff'; // fondo para fotos con transparencia
+  ctx.fill();
   drawScaled(ctx, image, rect.x, rect.y, rect.w, rect.h, env.createCanvas);
   ctx.restore();
 

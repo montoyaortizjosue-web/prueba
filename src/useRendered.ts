@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { composite } from './lib';
+import { composite, decodeBlob, release } from './lib';
 import type { Photo, StyleOptions } from './types';
 
 export interface Rendered {
@@ -42,7 +42,13 @@ export function useRendered(photos: Photo[], options: StyleOptions, limit: numbe
     (async () => {
       try {
         for (const p of todo) {
-          const blob = await composite(p.canvas, options);
+          const source = await decodeBlob(p.blob);
+          let blob: Blob;
+          try {
+            blob = await composite(source, options);
+          } finally {
+            release(source);
+          }
           if (cancelled) return;
           cache.current.set(`${p.id}|${optsKey}`, { blob, url: URL.createObjectURL(blob) });
           bump((n) => n + 1);

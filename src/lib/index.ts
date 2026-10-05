@@ -5,3 +5,4 @@ export * from './filename';
 export * from './composite';
 export * from './openFile';
 export * from './scale';
+export * from './decode';

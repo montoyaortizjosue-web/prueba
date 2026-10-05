@@ -1,7 +1,7 @@
 // Solo desarrollo: lo usa scripts/render-samples.mjs. No entra en el build.
 import '@fontsource/fredoka/600.css';
 import '@fontsource/nunito/800.css';
-import { composite, openFile } from './lib';
+import { composite, decodeBlob, openFile } from './lib';
 
 declare global {
   interface Window {
@@ -32,7 +32,7 @@ window.makeJpeg = async (w, h, label) => {
 window.run = async (f, opts) => {
   const file = new File([new Uint8Array(f.bytes)], f.name, { type: f.type });
   const photo = await openFile(file);
-  const out = await composite(photo.canvas, opts);
+  const out = await composite(await decodeBlob(photo.blob), opts);
   const buf = new Uint8Array(await out.arrayBuffer());
   let s = '';
   for (const b of buf) s += String.fromCharCode(b);

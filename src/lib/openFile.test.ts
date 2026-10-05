@@ -3,13 +3,13 @@ import { MSG_BROKEN, MSG_FORMAT, MSG_HEIC, openFile, openFiles, type OpenDeps } 
 import type { Drawable } from './types';
 
 const fakeImage = { width: 4000, height: 3000 } as unknown as Drawable;
-const fakeCanvas = (w: number, h: number) => ({ width: w, height: h }) as unknown as HTMLCanvasElement;
+const prepared = (w: number, h: number) => ({ blob: new Blob(['j']), thumb: new Blob(['t']), width: w, height: h });
 
 function deps(over: Partial<OpenDeps> = {}): OpenDeps {
   return {
     loaders: [async () => fakeImage],
     convertHeic: async () => new Blob(['jpeg']),
-    toCanvas: (_s, max) => fakeCanvas(max, (max * 3) / 4),
+    prepare: async (_s, max) => prepared(max, (max * 3) / 4),
     ...over,
   };
 }
@@ -19,9 +19,9 @@ const fail = () => Promise.reject(new Error('no'));
 
 describe('openFile', () => {
   it('reduce a 2000 px por el lado largo', async () => {
-    const toCanvas = vi.fn((_s: Drawable, max: number) => fakeCanvas(max, 1500));
-    const p = await openFile(file('a.jpg'), deps({ toCanvas }));
-    expect(toCanvas).toHaveBeenCalledWith(fakeImage, 2000);
+    const prepare = vi.fn(async (_s: Drawable, max: number) => prepared(max, 1500));
+    const p = await openFile(file('a.jpg'), deps({ prepare }));
+    expect(prepare).toHaveBeenCalledWith(fakeImage, 2000);
     expect(p).toMatchObject({ name: 'a.jpg', width: 2000, height: 1500 });
   });
 
@@ -64,6 +64,22 @@ describe('openFile', () => {
   it('HEIC no convertible -> mensaje de HEIC', async () => {
     const d = deps({ loaders: [fail], convertHeic: fail });
     await expect(openFile(file('a.heic', ''), d)).rejects.toThrow(MSG_HEIC);
+  });
+
+  it('si un método abre la foto pero no se puede reducir, prueba el siguiente', async () => {
+    const calls: string[] = [];
+    const a = { id: 'a' } as unknown as Drawable;
+    const b = { id: 'b' } as unknown as Drawable;
+    const d = deps({
+      loaders: [async () => a, async () => b],
+      prepare: async (src) => {
+        calls.push((src as unknown as { id: string }).id);
+        if (src === a) throw new Error('canvas demasiado grande');
+        return prepared(10, 10);
+      },
+    });
+    await expect(openFile(file('enorme.jpg'), d)).resolves.toMatchObject({ width: 10 });
+    expect(calls).toEqual(['a', 'b']);
   });
 
   it('foto dañada -> mensaje de Google Fotos', async () => {

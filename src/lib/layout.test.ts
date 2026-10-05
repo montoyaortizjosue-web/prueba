@@ -112,6 +112,14 @@ describe('halvingSteps', () => {
   it('sin pasos si la reducción es menor a 2x', () => {
     expect(halvingSteps(1000, 1000, 600, 600)).toEqual([]);
   });
+  it('fotos enormes: primer salto directo bajo el límite de área, luego mitades', () => {
+    const steps = halvingSteps(12000, 9000, 1080, 810);
+    expect(steps[0].w * steps[0].h).toBeLessThanOrEqual(12_000_000);
+    expect(steps.every((s) => s.w * s.h <= 12_000_000)).toBe(true);
+    const last = steps.at(-1)!;
+    expect(last.w).toBeGreaterThanOrEqual(1080);
+    expect(last.h).toBeGreaterThanOrEqual(810);
+  });
   it('sin pasos al ampliar', () => {
     expect(halvingSteps(100, 100, 400, 400)).toEqual([]);
   });
