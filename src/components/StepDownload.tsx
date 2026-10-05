@@ -36,6 +36,22 @@ export function StepDownload({ photos, get, onRestart, onStatus, headingRef }: P
     }
   };
 
+  // Fotos sueltas, una tras otra (sin zip). Si el navegador pregunta si permites
+  // varias descargas, hay que aceptar.
+  const downloadAll = async () => {
+    setWorking(true);
+    try {
+      for (let i = 0; i < items.length; i++) {
+        onStatus(`Descargando foto ${i + 1} de ${items.length}…`);
+        saveBlob(items[i].blob, names[i]);
+        await new Promise((r) => setTimeout(r, 600));
+      }
+      onStatus(`Listo: se descargaron ${items.length} ${items.length === 1 ? 'foto' : 'fotos'}`);
+    } finally {
+      setWorking(false);
+    }
+  };
+
   const share = async (list: typeof items) => {
     try {
       await navigator.share({ files: toFiles(list), title: 'Fotos Ashanty Store' });
@@ -50,7 +66,7 @@ export function StepDownload({ photos, get, onRestart, onStatus, headingRef }: P
       title="Descarga tus fotos"
       help="¡Listo! Tus fotos ya tienen el marco y el logo de Ashanty."
       todo={[
-        'Toca el botón de descargar y acepta la confirmación del navegador.',
+        <>Toca <strong>Descargar todo</strong> (o <strong>Descargar</strong> en cada foto) y acepta la confirmación del navegador.</>,
         'Busca las fotos en la carpeta Descargas o en tu galería.',
         'Súbelas a TikTok, Instagram o WhatsApp.',
       ]}
@@ -83,6 +99,20 @@ export function StepDownload({ photos, get, onRestart, onStatus, headingRef }: P
           </li>
         ))}
       </ul>
+
+      <button
+        type="button"
+        className="btn primary big"
+        disabled={working || items.length === 0}
+        onClick={downloadAll}
+      >
+        Descargar todo
+      </button>
+      {working && (
+        <p className="small" role="status">
+          Descargando… si el navegador pregunta si permites varias descargas, toca Permitir.
+        </p>
+      )}
 
       <button type="button" className="btn restart" onClick={onRestart}>
         Empezar de nuevo
