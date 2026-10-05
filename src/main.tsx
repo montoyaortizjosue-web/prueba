@@ -1,8 +1,12 @@
+import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import '@fontsource/fredoka/600.css';
+import '@fontsource/nunito/800.css';
+import App from './App';
+import './styles.css';
 
-// Marcador de la etapa 1: la interfaz llega en la etapa 2.
 createRoot(document.getElementById('root')!).render(
-  <p style={{ fontFamily: 'sans-serif', padding: 24 }}>
-    Ashanty Editor — motor de imagen listo. La interfaz llega en la etapa 2.
-  </p>,
+  <StrictMode>
+    <App />
+  </StrictMode>,
 );
