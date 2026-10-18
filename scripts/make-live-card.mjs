@@ -41,11 +41,15 @@ for (const [file, W, H, logoW] of CARDS) {
     const total = 0.81 * em + (x.font = `600 ${em}px Fredoka`, x.measureText('shanty').width);
     const x0 = (W - total) / 2;
 
-    const storeSize = em * 0.17, storeCap = storeSize * 0.7;
-    const numSize = em * 0.3, numCap = numSize * 0.7;
-    const gap1 = em * 0.22, gap2 = em * 0.34;
+    // Líneas bajo el logo: [texto, tamaño, separación de letras, color, espacio antes]
+    const lines = [
+      ['STORE', em * 0.17, 0.55, WHITE, em * 0.22],
+      ['100 % ONLINE', em * 0.2, 0.28, PINK, em * 0.3],
+      ['Contacta al número siguiente', em * 0.17, 0.04, WHITE, em * 0.26],
+      [number, em * 0.3, 0.08, PINK, em * 0.14],
+    ];
     const logoBottom = em + 0.27 * em;           // base + descendente
-    const blockH = logoBottom + gap1 + storeCap + gap2 + numCap;
+    const blockH = logoBottom + lines.reduce((h, [, size, , , gap]) => h + gap + size * 0.7, 0);
     const y0 = (H - blockH) / 2;
     const base = y0 + em;
 
@@ -70,9 +74,11 @@ for (const [file, W, H, logoW] of CARDS) {
       let px = (W - (widths.reduce((a, b) => a + b, 0) + gap * (chars.length - 1))) / 2;
       chars.forEach((ch, i) => { x.fillText(ch, px, baseline); px += widths[i] + gap; });
     };
-    const storeBase = y0 + logoBottom + gap1 + storeCap;
-    spaced('STORE', storeSize, 0.55, WHITE, storeBase);
-    spaced(number, numSize, 0.08, PINK, storeBase + gap2 + numCap);
+    let y = y0 + logoBottom;
+    for (const [text, size, spacing, color, gap] of lines) {
+      y += gap + size * 0.7;
+      spaced(text, size, spacing, color, y);
+    }
     return c.toDataURL('image/png').split(',')[1];
   }, [W, H, logoW, number, PATHS]);
   writeFileSync(file, Buffer.from(b64, 'base64'));
