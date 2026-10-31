@@ -6,6 +6,7 @@ Pantalla de inicio personalizada (HTML, un solo archivo) pensada para radios And
 
 ## Qué incluye
 - Saludo según la hora + tu nombre, reloj grande y fecha en español.
+- Foto real del Kia Seltos negro (fondo removido, embebida en el HTML: sigue siendo un solo archivo).
 - Clima en vivo (Open-Meteo, sin API key) usando el GPS del radio.
 - Tarjeta de música con controles.
 - Selector de modo de manejo ECO / NORMAL / SPORT con consumo estimado.
