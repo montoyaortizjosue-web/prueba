@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="theme-color" content="#05070c">
+<title>Seltos Launcher</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --accent: #ff3b3b;
+    --accent-2: #ff8a3d;
+    --bg: #05070c;
+    --glass: rgba(14, 18, 28, 0.55);
+    --glass-strong: rgba(10, 13, 20, 0.78);
+    --line: rgba(255, 255, 255, 0.10);
+    --text: #f3f5f8;
+    --muted: #9aa3b2;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+    font-family: "Inter", system-ui, sans-serif; user-select: none; }
+
+  /* Lienzo fijo 1280x720 escalado a la pantalla del radio */
+  #stage { position: absolute; top: 50%; left: 50%; width: 1280px; height: 720px;
+    transform-origin: center; overflow: hidden; border-radius: 6px; }
+
+  /* ---------- Fondo ---------- */
+  .scene { position: absolute; inset: 0; }
+  .sky { position: absolute; inset: 0;
+    background: radial-gradient(120% 85% at 70% 80%, #ff7a2f 0%, #c2361f 22%, #4a1530 45%, #120d22 68%, #05070c 100%); }
+  body.day .sky { background: radial-gradient(120% 80% at 70% 110%, #ffd9a0 0%, #7fb4e6 35%, #2c5f9e 70%, #0f2747 100%); }
+  .sun { position: absolute; left: 820px; top: 330px; width: 220px; height: 220px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,210,140,.95), rgba(255,120,40,.5) 40%, transparent 70%);
+    filter: blur(6px); animation: pulse 8s ease-in-out infinite; }
+  @keyframes pulse { 50% { transform: scale(1.08); opacity: .85; } }
+  .mountains, .city { position: absolute; left: 0; bottom: 150px; width: 100%; }
+  .road { position: absolute; left: 0; right: 0; bottom: 0; height: 170px;
+    background: linear-gradient(180deg, rgba(255,120,50,.20), rgba(5,7,12,.95) 70%); }
+  .road::after { content: ""; position: absolute; inset: 0;
+    background: repeating-linear-gradient(90deg, transparent 0 60px, rgba(255,160,80,.10) 60px 62px);
+    mask-image: linear-gradient(180deg, #000, transparent); -webkit-mask-image: linear-gradient(180deg, #000, transparent); }
+  .vignette { position: absolute; inset: 0;
+    background: linear-gradient(90deg, rgba(5,7,12,.92) 0%, rgba(5,7,12,.55) 32%, transparent 55%),
+                linear-gradient(0deg, rgba(5,7,12,.7) 0%, transparent 22%); }
+
+  /* ---------- Auto ---------- */
+  .car { position: absolute; left: 500px; top: 248px; width: 700px; filter: drop-shadow(0 30px 30px rgba(0,0,0,.6)); }
+  .car .reflection { filter: blur(2px);
+    mask-image: linear-gradient(180deg, transparent 40%, #000); -webkit-mask-image: linear-gradient(180deg, transparent 40%, #000); }
+  .headlight { animation: glow 3s ease-in-out infinite; }
+  @keyframes glow { 50% { opacity: .55; } }
+
+  /* ---------- Barra superior ---------- */
+  .topbar { position: absolute; top: 0; left: 0; right: 0; height: 56px; display: flex; align-items: center;
+    padding: 0 26px; gap: 18px; z-index: 5; }
+  .brand { font-family: "Rajdhani", sans-serif; font-weight: 700; letter-spacing: 6px; font-size: 22px; }
+  .brand small { font-weight: 500; letter-spacing: 2px; color: var(--muted); font-size: 14px; margin-left: 8px; }
+  .sep { width: 1px; height: 22px; background: var(--line); }
+  .topbar .spacer { flex: 1; height: 1px; background: linear-gradient(90deg, var(--line), transparent); }
+  .status { display: flex; gap: 16px; align-items: center; color: var(--muted); font-size: 14px; }
+  .status svg { width: 20px; height: 20px; }
+  .status .on { color: var(--text); }
+
+  /* ---------- Columna izquierda ---------- */
+  .left { position: absolute; left: 26px; top: 72px; width: 400px; z-index: 4; display: flex; flex-direction: column; gap: 14px; }
+  .greet { color: var(--muted); font-size: 18px; }
+  .name { font-family: "Rajdhani", sans-serif; font-weight: 700; font-size: 52px; line-height: 1; cursor: pointer; }
+  .clock-row { display: flex; align-items: center; gap: 16px; margin-top: 2px; }
+  .clock { font-family: "Rajdhani", sans-serif; font-weight: 600; font-size: 64px; line-height: 1; }
+  .date { border-left: 1px solid var(--line); padding-left: 14px; color: var(--muted); font-size: 15px; line-height: 1.35; text-transform: capitalize; }
+
+  .card { background: var(--glass); border: 1px solid var(--line); border-radius: 18px;
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); padding: 14px 16px; }
+  .weather { display: flex; align-items: center; gap: 14px; }
+  .weather .ico { font-size: 34px; width: 44px; text-align: center; }
+  .weather .t { font-family: "Rajdhani", sans-serif; font-size: 34px; font-weight: 600; }
+  .weather .d { color: var(--muted); font-size: 14px; }
+
+  .media { display: flex; flex-direction: column; gap: 10px; }
+  .media .top { display: flex; gap: 14px; align-items: center; }
+  .cover { width: 58px; height: 58px; border-radius: 12px; flex: none;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2)); display: grid; place-items: center; }
+  .cover svg { width: 28px; height: 28px; }
+  .track { font-weight: 600; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .artist { color: var(--muted); font-size: 13px; }
+  .bar { height: 4px; border-radius: 4px; background: rgba(255,255,255,.12); overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .5s linear; }
+  .controls { display: flex; justify-content: center; gap: 26px; align-items: center; }
+  .controls button { background: none; border: 0; color: var(--text); cursor: pointer; display: grid; place-items: center; }
+  .controls svg { width: 26px; height: 26px; }
+  .controls .play { width: 50px; height: 50px; border-radius: 50%; border: 2px solid var(--text); }
+
+  /* ---------- Modo de manejo ---------- */
+  .modes { position: absolute; right: 26px; top: 72px; z-index: 4; display: flex; gap: 6px;
+    background: var(--glass); border: 1px solid var(--line); border-radius: 999px; padding: 5px; backdrop-filter: blur(10px); }
+  .modes button { border: 0; background: none; color: var(--muted); font: 600 14px "Rajdhani", sans-serif; letter-spacing: 2px;
+    padding: 7px 16px; border-radius: 999px; cursor: pointer; }
+  .modes button.active { color: #fff; background: var(--accent); box-shadow: 0 0 18px var(--accent); }
+
+  .stats { position: absolute; right: 26px; top: 128px; z-index: 4; display: flex; gap: 10px; }
+  .stat { text-align: right; padding: 8px 14px; }
+  .stat b { display: block; font: 600 26px "Rajdhani", sans-serif; }
+  .stat span { color: var(--muted); font-size: 12px; letter-spacing: 1px; text-transform: uppercase; }
+
+  /* ---------- Dock de apps ---------- */
+  .dock { position: absolute; left: 26px; right: 26px; bottom: 20px; z-index: 6; display: grid;
+    grid-template-columns: repeat(8, 1fr); gap: 12px; }
+  .app { height: 108px; border-radius: 18px; background: var(--glass-strong); border: 1px solid var(--line);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    color: var(--text); text-decoration: none; cursor: pointer; transition: transform .15s, border-color .2s, box-shadow .2s; position: relative; overflow: hidden; }
+  .app::before { content: ""; position: absolute; inset: auto 20% 0 20%; height: 2px; background: var(--accent); opacity: 0; transition: opacity .2s; }
+  .app:hover, .app:focus-visible { border-color: rgba(255,255,255,.25); outline: none; }
+  .app:active { transform: scale(.95); }
+  .app.primary { border-color: var(--accent); box-shadow: inset 0 0 24px rgba(255,59,59,.25), 0 0 16px rgba(255,59,59,.25); }
+  .app.primary::before, .app:hover::before { opacity: 1; }
+  .app svg { width: 34px; height: 34px; }
+  .app b { font-weight: 600; font-size: 14px; }
+  .app span { color: var(--muted); font-size: 11px; margin-top: -6px; }
+
+  /* ---------- Panel de ajustes ---------- */
+  .sheet { position: absolute; inset: 0; z-index: 20; background: rgba(0,0,0,.55); display: none; place-items: center; }
+  .sheet.open { display: grid; }
+  .sheet .panel { width: 560px; background: #0d111a; border: 1px solid var(--line); border-radius: 22px; padding: 26px; display: flex; flex-direction: column; gap: 18px; }
+  .panel h2 { font: 700 26px "Rajdhani", sans-serif; letter-spacing: 2px; }
+  .panel label { color: var(--muted); font-size: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .panel input { background: #161b26; border: 1px solid var(--line); color: var(--text); border-radius: 10px; padding: 12px; font-size: 18px; }
+  .swatches { display: flex; gap: 12px; }
+  .swatch { width: 44px; height: 44px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; }
+  .swatch.sel { border-color: #fff; }
+  .row { display: flex; gap: 10px; }
+  .btn { flex: 1; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: #161b26; color: var(--text); font-size: 16px; cursor: pointer; }
+  .btn.main { background: var(--accent); border-color: var(--accent); }
+</style>
+</head>
+<body>
+<div id="stage">
+  <!-- Fondo -->
+  <div class="scene">
+    <div class="sky"></div>
+    <div class="sun"></div>
+    <svg class="mountains" viewBox="0 0 1280 300" preserveAspectRatio="none" height="300">
+      <path d="M0 210 L120 150 L230 190 L360 110 L480 175 L600 120 L720 180 L860 95 L990 170 L1120 120 L1280 175 L1280 300 L0 300Z" fill="#1a0f1f" opacity=".85"/>
+      <path d="M0 240 L160 200 L300 230 L460 185 L620 230 L780 190 L960 235 L1130 195 L1280 225 L1280 300 L0 300Z" fill="#0d0a14"/>
+    </svg>
+    <svg class="city" viewBox="0 0 1280 200" preserveAspectRatio="none" height="200" id="city"></svg>
+    <div class="road"></div>
+    <div class="vignette"></div>
+  </div>
+
+  <!-- Kia Seltos estilizado (silueta propia en SVG) -->
+  <svg class="car" viewBox="0 0 700 360" aria-label="Kia Seltos">
+    <defs>
+      <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#3a3f4a"/><stop offset=".45" stop-color="#20242c"/><stop offset="1" stop-color="#0c0e12"/>
+      </linearGradient>
+      <linearGradient id="roof" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#e9ecef"/><stop offset="1" stop-color="#9aa0a8"/>
+      </linearGradient>
+      <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#1b2433"/><stop offset="1" stop-color="#05070b"/>
+      </linearGradient>
+      <radialGradient id="rim"><stop offset="0" stop-color="#cfd3d8"/><stop offset=".6" stop-color="#6b717a"/><stop offset="1" stop-color="#1b1d21"/></radialGradient>
+      <linearGradient id="beam" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#fff6d8" stop-opacity=".0"/><stop offset="1" stop-color="#fff6d8" stop-opacity=".9"/>
+      </linearGradient>
+      <g id="carShape">
+        <!-- carrocería -->
+        <path d="M40 235 C40 205 60 190 95 184 L175 172 L250 112 C262 102 278 98 296 98 L505 98 C528 98 545 104 560 118 L620 170 C650 176 668 188 672 210 L676 248 C676 262 668 270 654 270 L40 270 Z" fill="url(#body)"/>
+        <!-- techo bitono -->
+        <path d="M262 108 C272 101 284 98 298 98 L505 98 C522 98 536 102 548 112 L540 118 L270 118 Z" fill="url(#roof)"/>
+        <!-- rieles -->
+        <rect x="300" y="88" width="210" height="6" rx="3" fill="#b8bdc4"/>
+        <!-- ventanas -->
+        <path d="M200 175 L262 126 C270 120 278 118 290 118 L380 118 L380 175 Z" fill="url(#glass)"/>
+        <path d="M392 118 L505 118 C520 118 532 123 542 132 L585 172 L392 175 Z" fill="url(#glass)"/>
+        <path d="M384 118 L390 118 L390 176 L384 176Z" fill="#0b0d11"/>
+        <!-- línea de carácter -->
+        <path d="M70 205 C200 196 420 192 660 200" stroke="rgba(255,255,255,.22)" stroke-width="2" fill="none"/>
+        <!-- moldura inferior -->
+        <path d="M40 248 L676 248 L676 262 C676 266 670 270 662 270 L48 270 C44 270 40 266 40 262Z" fill="#0a0b0e"/>
+        <!-- arcos de rueda -->
+        <path d="M100 270 C100 222 130 200 170 200 C210 200 240 222 240 270Z" fill="#07080a"/>
+        <path d="M480 270 C480 222 510 200 550 200 C590 200 620 222 620 270Z" fill="#07080a"/>
+        <!-- ruedas -->
+        <g><circle cx="170" cy="268" r="58" fill="#0d0e10"/><circle cx="170" cy="268" r="40" fill="url(#rim)"/>
+          <g stroke="#2b2e33" stroke-width="5"><line x1="170" y1="232" x2="170" y2="304"/><line x1="134" y1="268" x2="206" y2="268"/><line x1="145" y1="243" x2="195" y2="293"/><line x1="195" y1="243" x2="145" y2="293"/></g>
+          <circle cx="170" cy="268" r="9" fill="#1a1c20"/></g>
+        <g><circle cx="550" cy="268" r="58" fill="#0d0e10"/><circle cx="550" cy="268" r="40" fill="url(#rim)"/>
+          <g stroke="#2b2e33" stroke-width="5"><line x1="550" y1="232" x2="550" y2="304"/><line x1="514" y1="268" x2="586" y2="268"/><line x1="525" y1="243" x2="575" y2="293"/><line x1="575" y1="243" x2="525" y2="293"/></g>
+          <circle cx="550" cy="268" r="9" fill="#1a1c20"/></g>
+        <!-- faro "Star Map" -->
+        <path class="headlight" d="M612 182 C630 184 652 190 664 200 L660 206 C640 200 622 196 606 192Z" fill="#fff4d6"/>
+        <path d="M614 214 L668 216" stroke="#fff4d6" stroke-width="3" stroke-linecap="round" class="headlight"/>
+        <!-- calavera -->
+        <path d="M44 196 L80 190 L82 204 L44 210Z" fill="var(--accent)"/>
+        <!-- manija -->
+        <rect x="330" y="190" width="30" height="5" rx="2" fill="#4a505a"/>
+        <rect x="460" y="190" width="30" height="5" rx="2" fill="#4a505a"/>
+        <!-- logo lateral -->
+        <text x="400" y="238" font-family="Rajdhani" font-weight="700" font-size="14" letter-spacing="3" fill="rgba(255,255,255,.55)">SELTOS</text>
+      </g>
+    </defs>
+    <path d="M670 200 L700 170 L700 240 Z" fill="url(#beam)" opacity=".35" class="headlight"/>
+    <use href="#carShape"/>
+    <use href="#carShape" class="reflection" transform="translate(0 652) scale(1 -1)" opacity=".18"/>
+  </svg>
+
+  <!-- Barra superior -->
+  <div class="topbar">
+    <div class="brand">KIA<small>SELTOS</small></div>
+    <div class="sep"></div>
+    <div class="spacer"></div>
+    <div class="status">
+      <span id="btStatus" title="Bluetooth"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 7l10 10-5 5V2l5 5L7 17"/></svg></span>
+      <span title="Wi-Fi" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 9a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1" fill="currentColor"/></svg></span>
+      <span id="miniClock" class="on" style="font-weight:600"></span>
+    </div>
+  </div>
+
+  <!-- Izquierda: saludo, hora, clima, música -->
+  <div class="left">
+    <div>
+      <div class="greet" id="greet">Hola,</div>
+      <div class="name" id="name" title="Toca para editar">Conductor</div>
+    </div>
+    <div class="clock-row">
+      <div class="clock" id="clock">--:--</div>
+      <div class="date" id="date"></div>
+    </div>
+    <div class="card weather">
+      <div class="ico" id="wIco">⛅</div>
+      <div>
+        <div class="t" id="wTemp">--°</div>
+        <div class="d" id="wDesc">Obteniendo clima…</div>
+      </div>
+    </div>
+    <div class="card media">
+      <div class="top">
+        <div class="cover"><svg viewBox="0 0 24 24" fill="#fff"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
+        <div style="min-width:0">
+          <div class="track" id="track">Sin reproducción</div>
+          <div class="artist" id="artist">Toca ▶ o abre Spotify</div>
+        </div>
+      </div>
+      <div class="bar"><i id="prog"></i></div>
+      <div class="controls">
+        <button aria-label="Anterior" id="prev"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zM9.5 12l8.5 6V6z"/></svg></button>
+        <button aria-label="Reproducir" class="play" id="play"><svg viewBox="0 0 24 24" fill="currentColor" id="playIco"><path d="M8 5v14l11-7z"/></svg></button>
+        <button aria-label="Siguiente" id="next"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/></svg></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modos de manejo + datos -->
+  <div class="modes" id="modes">
+    <button data-mode="eco">ECO</button>
+    <button data-mode="normal" class="active">NORMAL</button>
+    <button data-mode="sport">SPORT</button>
+  </div>
+  <div class="stats">
+    <div class="stat"><b id="odo">12,480</b><span>km</span></div>
+    <div class="stat"><b id="cons">15.2</b><span>km/l</span></div>
+  </div>
+
+  <!-- Dock -->
+  <nav class="dock">
+    <a class="app primary" href="intent:#Intent;package=com.google.android.projection.gearhead;end">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l8 19-8-4-8 4z"/></svg><b>Android Auto</b><span>Proyección</span></a>
+    <a class="app" href="https://waze.com/ul">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 15a8 8 0 1 1 14-5c0 4-3 7-7 7H8"/><circle cx="9" cy="10" r=".8" fill="currentColor"/><circle cx="15" cy="10" r=".8" fill="currentColor"/><path d="M9.5 13c1.5 1 3.5 1 5 0"/><circle cx="8" cy="19" r="1.6"/><circle cx="16" cy="19" r="1.6"/></svg><b>Waze</b><span>Navegación</span></a>
+    <a class="app" href="spotify:">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M7 9.5c3.5-1 7-.6 10 1M7.5 12.5c3-.8 6-.4 8.5 1M8 15.5c2.5-.6 5-.3 7 .8"/></svg><b>Spotify</b><span>Música</span></a>
+    <a class="app" href="intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.APP_MUSIC;end">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M7 8l10-5"/><circle cx="15" cy="14" r="3"/><path d="M6 12h4M6 15h4"/></svg><b>Radio</b><span>FM / AM</span></a>
+    <a class="app" href="intent:#Intent;action=android.settings.BLUETOOTH_SETTINGS;end">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 7l10 10-5 5V2l5 5L7 17"/></svg><b>Bluetooth</b><span>Teléfono</span></a>
+    <a class="app" href="intent:#Intent;action=android.intent.action.VIEW;type=video/*;end">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="8" y="2" width="8" height="8" rx="1"/><path d="M6 10h12v9a3 3 0 0 1-3 3H9a3 3 0 0 1-3-3z"/><path d="M10 5h1M13 5h1"/></svg><b>USB</b><span>Medios</span></a>
+    <a class="app" href="intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.HOME;end">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><b>Aplicaciones</b><span>Más apps</span></a>
+    <a class="app" id="openSettings" role="button" tabindex="0">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><b>Ajustes</b><span>Personalizar</span></a>
+  </nav>
+
+  <!-- Ajustes -->
+  <div class="sheet" id="sheet">
+    <div class="panel">
+      <h2>PERSONALIZAR</h2>
+      <label>Tu nombre<input id="nameInput" maxlength="16"></label>
+      <label>Color de acento
+        <div class="swatches" id="swatches"></div>
+      </label>
+      <label>Kilometraje actual<input id="odoInput" inputmode="numeric"></label>
+      <div class="row">
+        <button class="btn" id="toggleDay">Modo día / noche</button>
+      </div>
+      <div class="row">
+        <button class="btn" id="closeSettings">Cancelar</button>
+        <button class="btn main" id="saveSettings">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem("seltos." + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem("seltos." + k, JSON.stringify(v)); } catch {} }
+  };
+
+  // Escalar el lienzo 1280x720 a cualquier pantalla (9", 10", 1024x600, etc.)
+  const stage = $("stage");
+  function fit() {
+    const s = Math.min(innerWidth / 1280, innerHeight / 720);
+    stage.style.transform = `translate(-50%, -50%) scale(${s})`;
+  }
+  addEventListener("resize", fit); fit();
+
+  // Edificios de la ciudad con ventanas encendidas
+  const city = $("city"); let svg = "";
+  for (let x = 0; x < 1280; ) {
+    const w = 30 + Math.random() * 50, h = 40 + Math.random() * 110;
+    svg += `<rect x="${x}" y="${200 - h}" width="${w}" height="${h}" fill="#08070d"/>`;
+    for (let wy = 200 - h + 8; wy < 195; wy += 12)
+      for (let wx = x + 5; wx < x + w - 6; wx += 10)
+        if (Math.random() < .28) svg += `<rect x="${wx}" y="${wy}" width="4" height="5" fill="#ffb36b" opacity="${.4 + Math.random() * .6}"/>`;
+    x += w + 2;
+  }
+  city.innerHTML = svg;
+
+  // Ajustes guardados
+  const accents = [["#ff3b3b","#ff8a3d"],["#00b4ff","#6af0ff"],["#7c5cff","#d05cff"],["#19e28c","#c6ff4d"],["#ffb300","#ffe27a"],["#e8e8e8","#9aa3b2"]];
+  let cfg = { name: store.get("name", "Conductor"), accent: store.get("accent", 0), odo: store.get("odo", 12480), day: store.get("day", null) };
+  function applyCfg() {
+    $("name").textContent = cfg.name;
+    const [a, b] = accents[cfg.accent] || accents[0];
+    document.documentElement.style.setProperty("--accent", a);
+    document.documentElement.style.setProperty("--accent-2", b);
+    $("odo").textContent = Number(cfg.odo).toLocaleString("es");
+  }
+  applyCfg();
+
+  // Reloj y fecha
+  function tick() {
+    const now = new Date();
+    const hm = now.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit", hour12: false });
+    $("clock").textContent = hm; $("miniClock").textContent = hm;
+    $("date").innerHTML = now.toLocaleDateString("es", { weekday: "long" }) + "<br>" +
+      now.toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric" });
+    const h = now.getHours();
+    $("greet").textContent = h < 12 ? "Buenos días," : h < 19 ? "Buenas tardes," : "Buenas noches,";
+    const isDay = cfg.day === null ? (h >= 7 && h < 18) : cfg.day;
+    document.body.classList.toggle("day", isDay);
+  }
+  tick(); setInterval(tick, 1000);
+
+  // Clima (Open-Meteo, sin API key)
+  const codes = { 0:["☀️","Despejado"],1:["🌤️","Mayormente despejado"],2:["⛅","Parcialmente nublado"],3:["☁️","Nublado"],
+    45:["🌫️","Neblina"],48:["🌫️","Neblina"],51:["🌦️","Llovizna"],53:["🌦️","Llovizna"],55:["🌧️","Llovizna intensa"],
+    61:["🌧️","Lluvia ligera"],63:["🌧️","Lluvia"],65:["🌧️","Lluvia fuerte"],80:["🌦️","Chubascos"],81:["🌧️","Chubascos"],
+    82:["⛈️","Chubascos fuertes"],95:["⛈️","Tormenta"],96:["⛈️","Tormenta"],99:["⛈️","Tormenta"] };
+  async function weather(lat, lon) {
+    try {
+      const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,wind_speed_10m`);
+      const c = (await r.json()).current;
+      const [ico, txt] = codes[c.weather_code] || ["🌡️", "—"];
+      $("wIco").textContent = ico; $("wTemp").textContent = Math.round(c.temperature_2m) + "°C";
+      $("wDesc").textContent = `${txt} · viento ${Math.round(c.wind_speed_10m)} km/h`;
+    } catch { $("wDesc").textContent = "Sin datos meteorológicos"; }
+  }
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(p => weather(p.coords.latitude, p.coords.longitude),
+      () => weather(-0.18, -78.47), { timeout: 8000 });
+  } else weather(-0.18, -78.47);
+  setInterval(() => navigator.geolocation?.getCurrentPosition(p => weather(p.coords.latitude, p.coords.longitude)), 15 * 60e3);
+
+  // Reproductor (control visual; usa la sesión multimedia si existe)
+  const demo = [["Ruta nocturna","Seltos Drive"],["Kilómetro cero","Road Trip"],["Luces de ciudad","Night Mix"]];
+  let idx = 0, playing = false, pos = 0;
+  const playPath = "M8 5v14l11-7z", pausePath = "M6 5h4v14H6zM14 5h4v14h-4z";
+  function show() { $("track").textContent = demo[idx][0]; $("artist").textContent = demo[idx][1]; }
+  $("play").onclick = () => { playing = !playing; if (pos === 0) show(); $("playIco").innerHTML = `<path d="${playing ? pausePath : playPath}"/>`; };
+  $("next").onclick = () => { idx = (idx + 1) % demo.length; pos = 0; show(); };
+  $("prev").onclick = () => { idx = (idx + demo.length - 1) % demo.length; pos = 0; show(); };
+  setInterval(() => { if (playing) { pos = (pos + .5) % 100; $("prog").style.width = pos + "%"; } }, 500);
+
+  // Modos de manejo
+  const modeCons = { eco: 17.8, normal: 15.2, sport: 11.6 };
+  $("modes").onclick = e => {
+    const b = e.target.closest("button"); if (!b) return;
+    document.querySelectorAll("#modes button").forEach(x => x.classList.toggle("active", x === b));
+    $("cons").textContent = modeCons[b.dataset.mode];
+    store.set("mode", b.dataset.mode);
+  };
+  const savedMode = store.get("mode", "normal");
+  document.querySelector(`#modes [data-mode="${savedMode}"]`)?.click();
+
+  // Panel de ajustes
+  const sw = $("swatches");
+  accents.forEach(([a, b], i) => {
+    const d = document.createElement("div");
+    d.className = "swatch"; d.style.background = `linear-gradient(135deg, ${a}, ${b})`; d.dataset.i = i;
+    sw.appendChild(d);
+  });
+  let pick = cfg.accent;
+  sw.onclick = e => { const d = e.target.closest(".swatch"); if (!d) return; pick = +d.dataset.i;
+    sw.querySelectorAll(".swatch").forEach(s => s.classList.toggle("sel", s === d)); };
+  function openSheet() {
+    $("nameInput").value = cfg.name; $("odoInput").value = cfg.odo; pick = cfg.accent;
+    sw.querySelectorAll(".swatch").forEach((s, i) => s.classList.toggle("sel", i === pick));
+    $("sheet").classList.add("open");
+  }
+  $("openSettings").onclick = openSheet;
+  $("name").onclick = openSheet;
+  $("closeSettings").onclick = () => $("sheet").classList.remove("open");
+  $("toggleDay").onclick = () => { cfg.day = !document.body.classList.contains("day"); store.set("day", cfg.day); tick(); };
+  $("saveSettings").onclick = () => {
+    cfg.name = $("nameInput").value.trim() || "Conductor";
+    cfg.odo = parseInt($("odoInput").value.replace(/\D/g, "")) || 0;
+    cfg.accent = pick;
+    store.set("name", cfg.name); store.set("odo", cfg.odo); store.set("accent", cfg.accent);
+    applyCfg(); $("sheet").classList.remove("open");
+  };
+})();
+</script>
+</body>
+</html>
